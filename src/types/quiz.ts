@@ -1,4 +1,6 @@
 
+export type DifficultyLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'monster';
+
 export interface Answer {
   id: string;
   text: string;
@@ -9,6 +11,8 @@ export interface Question {
   id: string;
   text: string;
   answers: Answer[];
+  difficultyLevel: DifficultyLevel;
+  category: string;
 }
 
 export interface Quiz {
@@ -17,3 +21,4 @@ export interface Quiz {
   description: string;
   questions: Question[];
 }
+
