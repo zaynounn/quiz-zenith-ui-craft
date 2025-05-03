@@ -37,11 +37,23 @@ const Quiz: React.FC<QuizProps> = ({ quiz }) => {
     return difficultyMatch && languageMatch;
   });
 
-  const currentQuestion = filteredQuestions[currentQuestionIndex];
+  // Make sure we have a valid current question index
+  useEffect(() => {
+    if (filteredQuestions.length === 0) {
+      return;
+    }
+    if (currentQuestionIndex >= filteredQuestions.length) {
+      setCurrentQuestionIndex(filteredQuestions.length - 1);
+    }
+  }, [filteredQuestions, currentQuestionIndex]);
+
+  const currentQuestion = filteredQuestions.length > 0 ? filteredQuestions[currentQuestionIndex] : null;
   const totalQuestions = filteredQuestions.length;
-  const progress = (answeredQuestions.size / totalQuestions) * 100;
+  const progress = totalQuestions > 0 ? (answeredQuestions.size / totalQuestions) * 100 : 0;
 
   const handleAnswerSelected = (isCorrect: boolean) => {
+    if (!currentQuestion) return;
+    
     if (isCorrect) {
       setScore(prevScore => prevScore + 1);
       toast({
@@ -159,7 +171,7 @@ const Quiz: React.FC<QuizProps> = ({ quiz }) => {
             {quiz.description}
           </CardDescription>
           
-          {!quizCompleted && filteredQuestions.length > 0 && (
+          {!quizCompleted && currentQuestion && filteredQuestions.length > 0 && (
             <div className="mt-4 space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <Badge className={difficultyColors[currentQuestion.difficultyLevel]}>
@@ -223,7 +235,7 @@ const Quiz: React.FC<QuizProps> = ({ quiz }) => {
         </CardContent>
         
         <CardFooter className="flex justify-between">
-          {!quizCompleted && filteredQuestions.length > 0 ? (
+          {!quizCompleted && currentQuestion && filteredQuestions.length > 0 ? (
             <>
               <Button 
                 variant="outline" 
