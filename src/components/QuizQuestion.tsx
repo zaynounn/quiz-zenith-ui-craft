@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { Question, Answer } from "../types/quiz";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Check, Circle, CircleX } from "lucide-react";
+import { Check, CircleX, Code } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -11,11 +11,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 interface QuizQuestionProps {
   question: Question;
   onAnswerSelected: (isCorrect: boolean) => void;
+  isCurrentQuestion: boolean;
 }
 
 const QuizQuestion: React.FC<QuizQuestionProps> = ({
   question,
   onAnswerSelected,
+  isCurrentQuestion,
 }) => {
   const [selectedAnswerId, setSelectedAnswerId] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
@@ -40,8 +42,16 @@ const QuizQuestion: React.FC<QuizQuestionProps> = ({
   // Determine if we should show code formatting for the question
   const hasCode = question.text.includes('\n') || question.text.includes('function');
   
+  // Only show if this is the current question
+  if (!isCurrentQuestion) return null;
+  
   return (
     <div className="mb-6 animate-fade-in">
+      <div className="flex items-center justify-between mb-2">
+        <Badge className="text-xs">{question.language}</Badge>
+        <Badge variant="outline" className="text-xs">{question.category}</Badge>
+      </div>
+      
       <h3 className="text-xl font-medium mb-4">
         {hasCode ? (
           <div>

@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect } from "react";
-import { Quiz as QuizType, DifficultyLevel } from "../types/quiz";
+import { Quiz as QuizType, DifficultyLevel, ProgrammingLanguage } from "../types/quiz";
 import QuizQuestion from "./QuizQuestion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, ArrowRight, Trophy, Layers } from "lucide-react";
+import { ArrowLeft, ArrowRight, Trophy, Code, Languages } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 
@@ -27,12 +27,15 @@ const Quiz: React.FC<QuizProps> = ({ quiz }) => {
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<string>>(new Set());
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel | 'all'>('all');
+  const [selectedLanguage, setSelectedLanguage] = useState<ProgrammingLanguage | 'all'>('all');
   const { toast } = useToast();
 
-  // Filter questions by selected difficulty
-  const filteredQuestions = selectedDifficulty === 'all' 
-    ? quiz.questions 
-    : quiz.questions.filter(q => q.difficultyLevel === selectedDifficulty);
+  // Filter questions by selected difficulty and language
+  const filteredQuestions = quiz.questions.filter(q => {
+    const difficultyMatch = selectedDifficulty === 'all' || q.difficultyLevel === selectedDifficulty;
+    const languageMatch = selectedLanguage === 'all' || q.language === selectedLanguage;
+    return difficultyMatch && languageMatch;
+  });
 
   const currentQuestion = filteredQuestions[currentQuestionIndex];
   const totalQuestions = filteredQuestions.length;
@@ -89,10 +92,10 @@ const Quiz: React.FC<QuizProps> = ({ quiz }) => {
     return answeredQuestions.has(questionId);
   };
   
-  // Reset currentQuestionIndex when difficulty changes
+  // Reset currentQuestionIndex when difficulty or language changes
   useEffect(() => {
     setCurrentQuestionIndex(0);
-  }, [selectedDifficulty]);
+  }, [selectedDifficulty, selectedLanguage]);
 
   // Reset quiz if no questions match filter
   useEffect(() => {
@@ -103,42 +106,68 @@ const Quiz: React.FC<QuizProps> = ({ quiz }) => {
     }
   }, [filteredQuestions, quizCompleted]);
 
+  // Get unique languages from quiz questions
+  const availableLanguages = Array.from(
+    new Set(quiz.questions.map(q => q.language))
+  );
+
   return (
     <div className="w-full max-w-3xl mx-auto">
       <Card className="shadow-md border-t-4 border-t-primary">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>{quiz.title}</span>
-            <Select 
-              value={selectedDifficulty} 
-              onValueChange={(value) => setSelectedDifficulty(value as DifficultyLevel | 'all')}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Select difficulty" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Levels</SelectItem>
-                <SelectItem value="beginner">Beginner</SelectItem>
-                <SelectItem value="intermediate">Intermediate</SelectItem>
-                <SelectItem value="advanced">Advanced</SelectItem>
-                <SelectItem value="expert">Expert</SelectItem>
-                <SelectItem value="monster">Monster</SelectItem>
-              </SelectContent>
-            </Select>
+            <span className="flex items-center gap-2">
+              <Code className="h-6 w-6 text-primary" />
+              {quiz.title}
+            </span>
+            <div className="flex gap-2">
+              <Select 
+                value={selectedLanguage} 
+                onValueChange={(value) => setSelectedLanguage(value as ProgrammingLanguage | 'all')}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Language" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Languages</SelectItem>
+                  {availableLanguages.map(lang => (
+                    <SelectItem key={lang} value={lang}>{lang}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select 
+                value={selectedDifficulty} 
+                onValueChange={(value) => setSelectedDifficulty(value as DifficultyLevel | 'all')}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Difficulty" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Levels</SelectItem>
+                  <SelectItem value="beginner">Beginner</SelectItem>
+                  <SelectItem value="intermediate">Intermediate</SelectItem>
+                  <SelectItem value="advanced">Advanced</SelectItem>
+                  <SelectItem value="expert">Expert</SelectItem>
+                  <SelectItem value="monster">Monster</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardTitle>
-          <CardDescription>{quiz.description}</CardDescription>
+          <CardDescription className="flex items-center gap-2">
+            <Languages className="h-4 w-4 text-muted-foreground" />
+            {quiz.description}
+          </CardDescription>
           
           {!quizCompleted && filteredQuestions.length > 0 && (
             <div className="mt-4 space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <Layers className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Difficulty:</span>
-                  <Badge className={difficultyColors[currentQuestion.difficultyLevel]}>
-                    {currentQuestion.difficultyLevel.charAt(0).toUpperCase() + currentQuestion.difficultyLevel.slice(1)}
-                  </Badge>
-                </div>
-                <Badge variant="outline">{currentQuestion.category}</Badge>
+                <Badge className={difficultyColors[currentQuestion.difficultyLevel]}>
+                  {currentQuestion.difficultyLevel.charAt(0).toUpperCase() + currentQuestion.difficultyLevel.slice(1)}
+                </Badge>
+                <span className="text-muted-foreground">
+                  Question {currentQuestionIndex + 1} of {totalQuestions}
+                </span>
               </div>
               
               <div className="w-full bg-secondary h-2 rounded-full">
@@ -154,13 +183,17 @@ const Quiz: React.FC<QuizProps> = ({ quiz }) => {
         <CardContent>
           {filteredQuestions.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-lg">No questions available for the selected difficulty level.</p>
+              <p className="text-lg">No questions available for the selected filters.</p>
             </div>
           ) : !quizCompleted ? (
-            <QuizQuestion 
-              question={currentQuestion} 
-              onAnswerSelected={handleAnswerSelected}
-            />
+            filteredQuestions.map((question, index) => (
+              <QuizQuestion 
+                key={question.id}
+                question={question}
+                onAnswerSelected={handleAnswerSelected}
+                isCurrentQuestion={index === currentQuestionIndex}
+              />
+            ))
           ) : (
             <div className="text-center py-8 space-y-4">
               <h2 className="text-3xl font-bold">Quiz Complete!</h2>
@@ -199,9 +232,6 @@ const Quiz: React.FC<QuizProps> = ({ quiz }) => {
               >
                 <ArrowLeft className="mr-2 h-4 w-4" /> Previous
               </Button>
-              <div className="text-sm text-muted-foreground">
-                Question {currentQuestionIndex + 1} of {totalQuestions}
-              </div>
               <Button 
                 variant="outline" 
                 onClick={handleNextQuestion}
