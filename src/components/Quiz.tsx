@@ -5,9 +5,11 @@ import QuizQuestion from "./QuizQuestion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, ArrowRight, Trophy, Code, Languages } from "lucide-react";
+import { ArrowLeft, ArrowRight, Trophy, Code, Languages, ListOrdered } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink } from "@/components/ui/pagination";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface QuizProps {
   quiz: QuizType;
@@ -28,6 +30,8 @@ const Quiz: React.FC<QuizProps> = ({ quiz }) => {
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel | 'all'>('all');
   const [selectedLanguage, setSelectedLanguage] = useState<ProgrammingLanguage | 'all'>('all');
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   // Filter questions by selected difficulty and language
@@ -37,18 +41,23 @@ const Quiz: React.FC<QuizProps> = ({ quiz }) => {
     return difficultyMatch && languageMatch;
   });
 
+  // Further filter by selected questions if in selection mode
+  const activeQuestions = isSelectionMode && selectedQuestionIds.size > 0 
+    ? filteredQuestions.filter(q => selectedQuestionIds.has(q.id))
+    : filteredQuestions;
+
   // Make sure we have a valid current question index
   useEffect(() => {
-    if (filteredQuestions.length === 0) {
+    if (activeQuestions.length === 0) {
       return;
     }
-    if (currentQuestionIndex >= filteredQuestions.length) {
-      setCurrentQuestionIndex(filteredQuestions.length - 1);
+    if (currentQuestionIndex >= activeQuestions.length) {
+      setCurrentQuestionIndex(activeQuestions.length - 1);
     }
-  }, [filteredQuestions, currentQuestionIndex]);
+  }, [activeQuestions, currentQuestionIndex]);
 
-  const currentQuestion = filteredQuestions.length > 0 ? filteredQuestions[currentQuestionIndex] : null;
-  const totalQuestions = filteredQuestions.length;
+  const currentQuestion = activeQuestions.length > 0 ? activeQuestions[currentQuestionIndex] : null;
+  const totalQuestions = activeQuestions.length;
   const progress = totalQuestions > 0 ? (answeredQuestions.size / totalQuestions) * 100 : 0;
 
   const handleAnswerSelected = (isCorrect: boolean) => {
@@ -104,6 +113,29 @@ const Quiz: React.FC<QuizProps> = ({ quiz }) => {
     return answeredQuestions.has(questionId);
   };
   
+  const handleQuestionSelect = (questionId: string) => {
+    setSelectedQuestionIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(questionId)) {
+        newSet.delete(questionId);
+      } else {
+        newSet.add(questionId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectionMode = () => {
+    // If exiting selection mode and we have selections, restart the quiz
+    if (isSelectionMode && selectedQuestionIds.size > 0) {
+      setCurrentQuestionIndex(0);
+      setScore(0);
+      setAnsweredQuestions(new Set());
+      setQuizCompleted(false);
+    }
+    setIsSelectionMode(!isSelectionMode);
+  };
+  
   // Reset currentQuestionIndex when difficulty or language changes
   useEffect(() => {
     setCurrentQuestionIndex(0);
@@ -111,12 +143,12 @@ const Quiz: React.FC<QuizProps> = ({ quiz }) => {
 
   // Reset quiz if no questions match filter
   useEffect(() => {
-    if (filteredQuestions.length === 0) {
+    if (activeQuestions.length === 0) {
       setQuizCompleted(true);
-    } else if (quizCompleted && filteredQuestions.length > 0) {
+    } else if (quizCompleted && activeQuestions.length > 0 && !isSelectionMode) {
       setQuizCompleted(false);
     }
-  }, [filteredQuestions, quizCompleted]);
+  }, [activeQuestions, quizCompleted, isSelectionMode]);
 
   // Get unique languages from quiz questions
   const availableLanguages = Array.from(
@@ -164,6 +196,16 @@ const Quiz: React.FC<QuizProps> = ({ quiz }) => {
                   <SelectItem value="monster">Monster</SelectItem>
                 </SelectContent>
               </Select>
+
+              <Button 
+                variant={isSelectionMode ? "default" : "outline"} 
+                size="sm" 
+                onClick={toggleSelectionMode}
+                className="flex items-center gap-1"
+              >
+                <ListOrdered className="h-4 w-4" />
+                {isSelectionMode ? "Done" : "Select Questions"}
+              </Button>
             </div>
           </CardTitle>
           <CardDescription className="flex items-center gap-2">
@@ -171,7 +213,7 @@ const Quiz: React.FC<QuizProps> = ({ quiz }) => {
             {quiz.description}
           </CardDescription>
           
-          {!quizCompleted && currentQuestion && filteredQuestions.length > 0 && (
+          {!quizCompleted && currentQuestion && activeQuestions.length > 0 && !isSelectionMode && (
             <div className="mt-4 space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <Badge className={difficultyColors[currentQuestion.difficultyLevel]}>
@@ -190,6 +232,17 @@ const Quiz: React.FC<QuizProps> = ({ quiz }) => {
               </div>
             </div>
           )}
+
+          {isSelectionMode && (
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-medium">Select questions for your quiz:</span>
+                <span className="text-sm text-muted-foreground">
+                  {selectedQuestionIds.size} question{selectedQuestionIds.size !== 1 ? 's' : ''} selected
+                </span>
+              </div>
+            </div>
+          )}
         </CardHeader>
         
         <CardContent>
@@ -197,8 +250,36 @@ const Quiz: React.FC<QuizProps> = ({ quiz }) => {
             <div className="text-center py-8">
               <p className="text-lg">No questions available for the selected filters.</p>
             </div>
+          ) : isSelectionMode ? (
+            <div className="space-y-3 max-h-96 overflow-y-auto p-1">
+              {filteredQuestions.map((question) => (
+                <div key={question.id} className="flex items-center space-x-2 p-3 border rounded-md hover:bg-muted/50">
+                  <Checkbox 
+                    id={`select-${question.id}`} 
+                    checked={selectedQuestionIds.has(question.id)}
+                    onCheckedChange={() => handleQuestionSelect(question.id)}
+                  />
+                  <div className="flex-1">
+                    <label 
+                      htmlFor={`select-${question.id}`} 
+                      className="flex justify-between items-center cursor-pointer text-sm"
+                    >
+                      <div className="line-clamp-2">
+                        {question.text.length > 50 ? `${question.text.substring(0, 50)}...` : question.text}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">{question.language}</Badge>
+                        <Badge className={`text-xs ${difficultyColors[question.difficultyLevel]}`}>
+                          {question.difficultyLevel}
+                        </Badge>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : !quizCompleted ? (
-            filteredQuestions.map((question, index) => (
+            activeQuestions.map((question, index) => (
               <QuizQuestion 
                 key={question.id}
                 question={question}
@@ -215,7 +296,7 @@ const Quiz: React.FC<QuizProps> = ({ quiz }) => {
                   You scored <span className="font-bold text-primary">{score}</span> out of <span className="font-bold">{totalQuestions}</span>
                 </p>
               </div>
-              <p>({Math.round((score / totalQuestions) * 100)}%)</p>
+              <p>({totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0}%)</p>
               
               <div className="my-4 p-6 bg-muted rounded-lg">
                 {score === totalQuestions ? (
@@ -235,7 +316,17 @@ const Quiz: React.FC<QuizProps> = ({ quiz }) => {
         </CardContent>
         
         <CardFooter className="flex justify-between">
-          {!quizCompleted && currentQuestion && filteredQuestions.length > 0 ? (
+          {isSelectionMode ? (
+            <div className="w-full flex justify-center">
+              <Button 
+                onClick={toggleSelectionMode} 
+                disabled={selectedQuestionIds.size === 0}
+                className="px-8"
+              >
+                Start Quiz with {selectedQuestionIds.size} Question{selectedQuestionIds.size !== 1 ? 's' : ''}
+              </Button>
+            </div>
+          ) : !quizCompleted && currentQuestion && activeQuestions.length > 0 ? (
             <>
               <Button 
                 variant="outline" 
@@ -244,6 +335,27 @@ const Quiz: React.FC<QuizProps> = ({ quiz }) => {
               >
                 <ArrowLeft className="mr-2 h-4 w-4" /> Previous
               </Button>
+              <Pagination>
+                <PaginationContent>
+                  {activeQuestions.length <= 10 ? (
+                    activeQuestions.map((_, index) => (
+                      <PaginationItem key={index}>
+                        <PaginationLink
+                          isActive={currentQuestionIndex === index}
+                          onClick={() => setCurrentQuestionIndex(index)}
+                          className={isQuestionAnswered(activeQuestions[index].id) ? "bg-green-100 dark:bg-green-900/20" : ""}
+                        >
+                          {index + 1}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ))
+                  ) : (
+                    <div className="flex items-center">
+                      <span className="text-sm">Question {currentQuestionIndex + 1} of {totalQuestions}</span>
+                    </div>
+                  )}
+                </PaginationContent>
+              </Pagination>
               <Button 
                 variant="outline" 
                 onClick={handleNextQuestion}
